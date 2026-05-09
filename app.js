@@ -465,61 +465,6 @@ function stopVoiceRecording(event) {
   }
 }
 
-function finishVoiceRecording() {
-  const transcript = voiceTranscript.trim();
-
-  activeRecognition = null;
-  shouldProcessVoice = false;
-
-  if (!transcript || transcript.length < 2) {
-    showToast("Não ouvi nada. Fale depois que aparecer: Ouvindo...");
-    return;
-  }
-
-  selectedVoiceItems = parseVoice(transcript);
-
-  if (selectedVoiceItems.length === 0) {
-    showToast(`Ouvi: "${transcript}", mas não achei figurinhas.`);
-    return;
-  }
-
-  openVoiceModal(transcript);
-}
-
-
-function cleanupVoice() {
-  setRecordingUI(false);
-  isRecording = false;
-
-  if (activeRecognition) {
-    try {
-      activeRecognition.abort();
-    } catch (err) {}
-  }
-
-  activeRecognition = null;
-}
-
-function finishVoiceRecording() {
-  const transcript = voiceTranscript.trim();
-
-  cleanupVoice();
-
-  if (!transcript || transcript.length < 3) {
-    showToast("Não ouvi nada. Segure o botão, fale e solte.");
-    return;
-  }
-
-  selectedVoiceItems = parseVoice(transcript);
-
-  if (selectedVoiceItems.length === 0) {
-    showToast('Não detectei figurinhas. Exemplo: "Brasil 2 Brasil 3 Brasil 4".');
-    return;
-  }
-
-  openVoiceModal(transcript);
-}
-
 function cleanupVoice() {
   setRecordingUI(false);
   isRecording = false;
