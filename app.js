@@ -627,11 +627,12 @@ document.getElementById("backBtn").onclick = () => {
 
 const voiceBtn = document.getElementById("voiceBtn");
 
-voiceBtn.addEventListener("pointerdown", startVoiceRecording);
-voiceBtn.addEventListener("pointerup", stopVoiceRecording);
-voiceBtn.addEventListener("pointercancel", stopVoiceRecording);
-voiceBtn.addEventListener("pointerleave", event => {
-  if (isRecording) stopVoiceRecording(event);
+voiceBtn.addEventListener("click", event => {
+  if (isRecording) {
+    stopVoiceRecording(event);
+  } else {
+    startVoiceRecording(event);
+  }
 });
 
 document.getElementById("modalConfirm").onclick = confirmModalNumbers;
