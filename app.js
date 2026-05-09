@@ -376,20 +376,16 @@ function parseVoice(text) {
   }));
 }
 
+let shouldProcessVoice = false;
+
 async function startVoiceRecording(event) {
   event.preventDefault();
 
   if (isRecording) return;
 
   try {
-    await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      }
-    });
-  } catch (err) {
+    await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
     showToast("Permita acesso ao microfone");
     return;
   }
@@ -403,6 +399,7 @@ async function startVoiceRecording(event) {
   }
 
   voiceTranscript = "";
+  shouldProcessVoice = false;
   isRecording = true;
   setRecordingUI(true);
 
@@ -410,50 +407,83 @@ async function startVoiceRecording(event) {
   activeRecognition.lang = "pt-BR";
   activeRecognition.continuous = true;
   activeRecognition.interimResults = true;
-  activeRecognition.maxAlternatives = 5;
-
-  let finalTranscript = "";
+  activeRecognition.maxAlternatives = 1;
 
   activeRecognition.onstart = () => {
-    showToast("Ouvindo...");
+    showToast("Ouvindo... fale agora");
   };
 
   activeRecognition.onresult = event => {
-    let interim = "";
+    let text = "";
 
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const transcript = event.results[i][0].transcript;
-
-      if (event.results[i].isFinal) {
-        finalTranscript += transcript + " ";
-      } else {
-        interim += transcript + " ";
-      }
+    for (let i = 0; i < event.results.length; i++) {
+      text += event.results[i][0].transcript + " ";
     }
 
-    voiceTranscript = `${finalTranscript} ${interim}`.trim();
+    voiceTranscript = text.trim();
+    console.log("OUVI:", voiceTranscript);
   };
 
   activeRecognition.onerror = event => {
-    if (event.error === "aborted" || event.error === "no-speech") {
-      return;
-    }
+    console.log("ERRO VOZ:", event.error);
 
-    showToast("Erro no microfone");
-    cleanupVoice();
+    if (event.error !== "no-speech" && event.error !== "aborted") {
+      showToast("Erro no microfone: " + event.error);
+    }
   };
 
   activeRecognition.onend = () => {
-    if (isRecording) return;
-    finishVoiceRecording();
+    setRecordingUI(false);
+    isRecording = false;
+
+    if (shouldProcessVoice) {
+      finishVoiceRecording();
+    }
   };
 
   try {
     activeRecognition.start();
-  } catch (err) {
-    showToast("Erro ao iniciar voz");
-    cleanupVoice();
+  } catch {
+    showToast("Erro ao iniciar microfone");
+    setRecordingUI(false);
+    isRecording = false;
   }
+}
+
+function stopVoiceRecording(event) {
+  event.preventDefault();
+
+  if (!isRecording || !activeRecognition) return;
+
+  shouldProcessVoice = true;
+  showToast("Interpretando...");
+
+  try {
+    activeRecognition.stop();
+  } catch {
+    finishVoiceRecording();
+  }
+}
+
+function finishVoiceRecording() {
+  const transcript = voiceTranscript.trim();
+
+  activeRecognition = null;
+  shouldProcessVoice = false;
+
+  if (!transcript || transcript.length < 2) {
+    showToast("Não ouvi nada. Fale depois que aparecer: Ouvindo...");
+    return;
+  }
+
+  selectedVoiceItems = parseVoice(transcript);
+
+  if (selectedVoiceItems.length === 0) {
+    showToast(`Ouvi: "${transcript}", mas não achei figurinhas.`);
+    return;
+  }
+
+  openVoiceModal(transcript);
 }
 
 function stopVoiceRecording(event) {
