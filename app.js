@@ -399,13 +399,12 @@ async function startVoiceRecording(event) {
   }
 
   voiceTranscript = "";
-  shouldProcessVoice = false;
   isRecording = true;
   setRecordingUI(true);
 
   activeRecognition = new SpeechRecognition();
   activeRecognition.lang = "pt-BR";
-  activeRecognition.continuous = true;
+  activeRecognition.continuous = false;
   activeRecognition.interimResults = true;
   activeRecognition.maxAlternatives = 1;
 
@@ -433,20 +432,14 @@ async function startVoiceRecording(event) {
   };
 
   activeRecognition.onend = () => {
-    setRecordingUI(false);
-    isRecording = false;
-
-    if (shouldProcessVoice) {
-      finishVoiceRecording();
-    }
+    finishVoiceRecording();
   };
 
   try {
     activeRecognition.start();
   } catch {
     showToast("Erro ao iniciar microfone");
-    setRecordingUI(false);
-    isRecording = false;
+    cleanupVoice();
   }
 }
 
@@ -454,9 +447,6 @@ function stopVoiceRecording(event) {
   event.preventDefault();
 
   if (!isRecording || !activeRecognition) return;
-
-  shouldProcessVoice = true;
-  showToast("Interpretando...");
 
   try {
     activeRecognition.stop();
@@ -468,13 +458,6 @@ function stopVoiceRecording(event) {
 function cleanupVoice() {
   setRecordingUI(false);
   isRecording = false;
-
-  if (activeRecognition) {
-    try {
-      activeRecognition.abort();
-    } catch (err) {}
-  }
-
   activeRecognition = null;
 }
 
@@ -483,15 +466,15 @@ function finishVoiceRecording() {
 
   cleanupVoice();
 
-  if (!transcript || transcript.length < 3) {
-    showToast("Não ouvi nada. Segure o botão, fale e solte.");
+  if (!transcript || transcript.length < 2) {
+    showToast("Não ouvi nada. Tente falar logo após tocar no microfone.");
     return;
   }
 
   selectedVoiceItems = parseVoice(transcript);
 
   if (selectedVoiceItems.length === 0) {
-    showToast('Não detectei figurinhas. Exemplo: "Brasil 2 Brasil 3 Brasil 4".');
+    showToast(`Ouvi: "${transcript}", mas não achei figurinhas.`);
     return;
   }
 
@@ -619,11 +602,7 @@ document.getElementById("backBtn").onclick = () => {
 const voiceBtn = document.getElementById("voiceBtn");
 
 voiceBtn.addEventListener("click", event => {
-  if (isRecording) {
-    stopVoiceRecording(event);
-  } else {
-    startVoiceRecording(event);
-  }
+  startVoiceRecording(event);
 });
 
 document.getElementById("modalConfirm").onclick = confirmModalNumbers;
