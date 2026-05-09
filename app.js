@@ -267,13 +267,22 @@ function matchCountryAt(tokens, index) {
 }
 
 function parseVoice(text) {
-  const clean = normalizeText(text);
+  const clean = normalizeText(text)
+    .replaceAll(",", " ")
+    .replaceAll(".", " ")
+    .replaceAll("-", " ");
+
+  console.log("NORMALIZED:", clean);
+
   const tokens = clean.split(" ").filter(Boolean);
+
   const found = new Map();
+
   let currentCountry = null;
 
   for (let i = 0; i < tokens.length; i++) {
     const countryMatch = matchCountryAt(tokens, i);
+
     if (countryMatch) {
       currentCountry = countryMatch.country;
       i += countryMatch.alias.length - 1;
@@ -281,10 +290,24 @@ function parseVoice(text) {
     }
 
     const num = numberFromToken(tokens[i]);
-    if (currentCountry && num) {
-      const valid = stickers.some(s => s.country === currentCountry && s.number === num);
+
+    if (
+      currentCountry &&
+      num &&
+      num >= 1 &&
+      num <= 20
+    ) {
+      const valid = stickers.some(
+        s =>
+          s.country === currentCountry &&
+          s.number === num
+      );
+
       if (valid) {
-        if (!found.has(currentCountry)) found.set(currentCountry, new Set());
+        if (!found.has(currentCountry)) {
+          found.set(currentCountry, new Set());
+        }
+
         found.get(currentCountry).add(num);
       }
     }
@@ -299,10 +322,13 @@ function parseVoice(text) {
 async function startVoiceRecording(event) {
   event.preventDefault();
 
-  // PRIMEIRO CLIQUE = pedir permissão
   try {
     await navigator.mediaDevices.getUserMedia({
-      audio: true
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
     });
   } catch (err) {
     showToast("Permita acesso ao microfone");
@@ -314,7 +340,7 @@ async function startVoiceRecording(event) {
     window.webkitSpeechRecognition;
 
   if (!SpeechRecognition) {
-    showToast("Seu navegador não suporta reconhecimento de voz");
+    showToast("Seu navegador não suporta voz");
     return;
   }
 
@@ -326,24 +352,44 @@ async function startVoiceRecording(event) {
   activeRecognition = new SpeechRecognition();
 
   activeRecognition.lang = "pt-BR";
+
+  // MELHORIAS IMPORTANTES
   activeRecognition.continuous = true;
   activeRecognition.interimResults = true;
-  activeRecognition.maxAlternatives = 1;
+  activeRecognition.maxAlternatives = 5;
+
+  // MAIS TEMPO ESCUTANDO
+  activeRecognition.serviceURI = "";
+
+  let finalTranscript = "";
+
+  activeRecognition.onstart = () => {
+    showToast("Ouvindo...");
+  };
 
   activeRecognition.onresult = (event) => {
-    let finalText = "";
+    let interim = "";
 
-    for (let i = 0; i < event.results.length; i++) {
-      finalText += event.results[i][0].transcript + " ";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const transcript =
+        event.results[i][0].transcript;
+
+      if (event.results[i].isFinal) {
+        finalTranscript += transcript + " ";
+      } else {
+        interim += transcript;
+      }
     }
 
-    voiceTranscript = finalText.trim();
+    voiceTranscript =
+      (finalTranscript + " " + interim).trim();
+
+    console.log("VOICE:", voiceTranscript);
   };
 
   activeRecognition.onerror = (event) => {
     console.log("VOICE ERROR:", event.error);
 
-    // ignora erro ao soltar botão
     if (
       event.error === "aborted" ||
       event.error === "no-speech"
@@ -351,21 +397,21 @@ async function startVoiceRecording(event) {
       return;
     }
 
-    showToast("Erro no reconhecimento de voz");
+    showToast("Erro no microfone");
     cleanupVoice();
   };
 
   activeRecognition.onend = () => {
-    if (isRecording) {
-      finishVoiceRecording();
-    }
+    if (isRecording) return;
+
+    finishVoiceRecording();
   };
 
   try {
     activeRecognition.start();
   } catch (err) {
     console.log(err);
-    showToast("Não foi possível iniciar o microfone");
+    showToast("Erro ao iniciar voz");
   }
 }
 
@@ -431,7 +477,7 @@ function finishVoiceRecording() {
     } catch (error) {}
   }
 
-  if (!voiceTranscript) {
+  if (!voiceTranscript || voiceTranscript.length < 3)
     showToast("Não ouvi nada. Segure o botão, fale e solte.");
     return;
   }
