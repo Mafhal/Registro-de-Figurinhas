@@ -399,17 +399,18 @@ async function startVoiceRecording(event) {
   }
 
   voiceTranscript = "";
+  shouldProcessVoice = false;
   isRecording = true;
   setRecordingUI(true);
 
   activeRecognition = new SpeechRecognition();
   activeRecognition.lang = "pt-BR";
-  activeRecognition.continuous = false;
+  activeRecognition.continuous = true;
   activeRecognition.interimResults = true;
   activeRecognition.maxAlternatives = 1;
 
   activeRecognition.onstart = () => {
-    showToast("Ouvindo... fale agora");
+    showToast("Gravando... toque novamente para parar");
   };
 
   activeRecognition.onresult = event => {
@@ -432,7 +433,16 @@ async function startVoiceRecording(event) {
   };
 
   activeRecognition.onend = () => {
-    finishVoiceRecording();
+    if (isRecording && !shouldProcessVoice) {
+      try {
+        activeRecognition.start();
+      } catch {}
+      return;
+    }
+
+    if (shouldProcessVoice) {
+      finishVoiceRecording();
+    }
   };
 
   try {
@@ -448,6 +458,9 @@ function stopVoiceRecording(event) {
 
   if (!isRecording || !activeRecognition) return;
 
+  shouldProcessVoice = true;
+  showToast("Interpretando...");
+
   try {
     activeRecognition.stop();
   } catch {
@@ -458,6 +471,7 @@ function stopVoiceRecording(event) {
 function cleanupVoice() {
   setRecordingUI(false);
   isRecording = false;
+  shouldProcessVoice = false;
   activeRecognition = null;
 }
 
@@ -467,7 +481,7 @@ function finishVoiceRecording() {
   cleanupVoice();
 
   if (!transcript || transcript.length < 2) {
-    showToast("Não ouvi nada. Tente falar logo após tocar no microfone.");
+    showToast("Não ouvi nada. Tente novamente.");
     return;
   }
 
