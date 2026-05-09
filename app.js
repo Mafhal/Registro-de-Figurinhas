@@ -36,7 +36,6 @@ let holdTimer = null;
 let activeRecognition = null;
 let voiceTranscript = "";
 let isRecording = false;
-let ignoreNextEnd = false;
 let toastTimer = null;
 
 let collection = JSON.parse(localStorage.getItem("figurinhas2026")) || {};
@@ -51,16 +50,28 @@ function saveCollapsedCards() {
 }
 
 function statusOf(id) {
-  if (!collection[id]) collection[id] = { owned: false, duplicates: 0 };
+  if (!collection[id]) {
+    collection[id] = { owned: false, duplicates: 0 };
+  }
+
   return collection[id];
 }
 
 function showToast(message) {
   const toast = document.getElementById("toast");
+
+  if (!toast) return;
+
   toast.textContent = message;
   toast.classList.remove("hidden");
+  toast.classList.add("show");
+
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.add("hidden"), 3200);
+
+  toastTimer = setTimeout(() => {
+    toast.classList.add("hidden");
+    toast.classList.remove("show");
+  }, 2600);
 }
 
 function setRecordingUI(active) {
@@ -73,13 +84,17 @@ function updateAlbumProgress() {
   const total = stickers.length;
   const owned = stickers.filter(sticker => statusOf(sticker.id).owned).length;
   const percent = total === 0 ? 0 : Math.round((owned / total) * 100);
-  document.getElementById("albumProgress").textContent = `${owned}/${total} figurinhas • ${percent}% completo`;
+
+  document.getElementById("albumProgress").textContent =
+    `${owned}/${total} figurinhas • ${percent}% completo`;
 }
 
 function render() {
   updateAlbumProgress();
 
-  document.getElementById("title").textContent = page === "colecao" ? "Figurinhas 2026" : "Repetidas";
+  document.getElementById("title").textContent =
+    page === "colecao" ? "Figurinhas 2026" : "Repetidas";
+
   document.getElementById("backBtn").classList.toggle("hidden", page === "colecao");
   document.getElementById("nextBtn").classList.toggle("hidden", page === "repetidas");
 
@@ -94,10 +109,19 @@ function render() {
     categoryTitle.textContent = category;
     app.appendChild(categoryTitle);
 
-    const countries = [...new Set(stickers.filter(s => s.category === category).map(s => s.country))];
+    const countries = [
+      ...new Set(
+        stickers
+          .filter(sticker => sticker.category === category)
+          .map(sticker => sticker.country)
+      )
+    ];
 
     countries.forEach(country => {
-      const countryStickers = stickers.filter(s => s.category === category && s.country === country);
+      const countryStickers = stickers.filter(
+        sticker => sticker.category === category && sticker.country === country
+      );
+
       const visibleStickers = countryStickers.filter(sticker => {
         const status = statusOf(sticker.id);
         return page === "colecao" || status.duplicates > 0;
@@ -113,6 +137,7 @@ function render() {
 
       const card = document.createElement("section");
       card.className = `country-card ${collapsed ? "collapsed" : ""}`;
+
       card.innerHTML = `
         <div class="country-head">
           <div>
@@ -122,12 +147,17 @@ function render() {
 
           <div class="country-right">
             <div class="country-progress">${percent}%</div>
-            <button class="collapse-btn" aria-label="${collapsed ? "Abrir card" : "Minimizar card"}">${collapsed ? "›" : "⌄"}</button>
+            <button class="collapse-btn" aria-label="${collapsed ? "Abrir card" : "Minimizar card"}">
+              ${collapsed ? "›" : "⌄"}
+            </button>
           </div>
         </div>
 
         <div class="card-content ${collapsed ? "hidden-card" : ""}">
-          <div class="progress-bar"><div class="progress-fill" style="width:${percent}%"></div></div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:${percent}%"></div>
+          </div>
+
           <div class="grid"></div>
         </div>
       `;
@@ -143,13 +173,22 @@ function render() {
 
       visibleStickers.forEach(sticker => {
         const status = statusOf(sticker.id);
+
         const button = document.createElement("button");
         button.className = "sticker";
 
-        if (page === "colecao" && status.owned) button.classList.add("owned");
-        if (page === "repetidas") button.classList.add("duplicate");
+        if (page === "colecao" && status.owned) {
+          button.classList.add("owned");
+        }
 
-        button.innerHTML = `${sticker.number}${status.duplicates > 0 ? `<span class="dup-count">${status.duplicates}</span>` : ""}`;
+        if (page === "repetidas") {
+          button.classList.add("duplicate");
+        }
+
+        button.innerHTML = `
+          ${sticker.number}
+          ${status.duplicates > 0 ? `<span class="dup-count">${status.duplicates}</span>` : ""}
+        `;
 
         button.addEventListener("click", () => {
           if (Date.now() - lastPointerDown > 650) return;
@@ -178,8 +217,11 @@ function clickSticker(sticker) {
   const status = statusOf(sticker.id);
 
   if (page === "colecao") {
-    if (!status.owned) status.owned = true;
-    else status.duplicates++;
+    if (!status.owned) {
+      status.owned = true;
+    } else {
+      status.duplicates++;
+    }
   } else {
     status.duplicates = Math.max(0, status.duplicates - 1);
   }
@@ -199,7 +241,10 @@ function removeSticker(sticker) {
     status.owned = false;
   }
 
-  if (navigator.vibrate) navigator.vibrate(45);
+  if (navigator.vibrate) {
+    navigator.vibrate(45);
+  }
+
   save();
   render();
 }
@@ -215,9 +260,14 @@ function normalizeText(text) {
 }
 
 const numberWords = {
-  "um": 1, "uma": 1, "primeiro": 1,
-  "dois": 2, "duas": 2, "segundo": 2,
-  "tres": 3, "terceiro": 3,
+  "um": 1,
+  "uma": 1,
+  "primeiro": 1,
+  "dois": 2,
+  "duas": 2,
+  "segundo": 2,
+  "tres": 3,
+  "terceiro": 3,
   "quatro": 4,
   "cinco": 5,
   "seis": 6,
@@ -228,10 +278,13 @@ const numberWords = {
   "onze": 11,
   "doze": 12,
   "treze": 13,
-  "quatorze": 14, "catorze": 14,
+  "quatorze": 14,
+  "catorze": 14,
   "quinze": 15,
-  "dezesseis": 16, "dezaseis": 16,
-  "dezessete": 17, "dezasete": 17,
+  "dezesseis": 16,
+  "dezaseis": 16,
+  "dezessete": 17,
+  "dezasete": 17,
   "dezoito": 18,
   "dezenove": 19,
   "vinte": 20
@@ -244,15 +297,25 @@ function numberFromToken(token) {
 
 function allCountryAliases() {
   const aliases = [];
+
   teams.forEach(([name, code]) => {
-    aliases.push({ country: name, alias: normalizeText(name).split(" ") });
-    aliases.push({ country: name, alias: [code.toLowerCase()] });
+    aliases.push({
+      country: name,
+      alias: normalizeText(name).split(" ")
+    });
+
+    aliases.push({
+      country: name,
+      alias: [code.toLowerCase()]
+    });
   });
+
   aliases.push({ country: "FIFA World Cup", alias: ["fifa"] });
   aliases.push({ country: "FIFA World Cup", alias: ["world", "cup"] });
   aliases.push({ country: "Coca-Cola", alias: ["coca"] });
   aliases.push({ country: "Coca-Cola", alias: ["coca-cola"] });
   aliases.push({ country: "Coca-Cola", alias: ["cola"] });
+
   return aliases.sort((a, b) => b.alias.length - a.alias.length);
 }
 
@@ -261,8 +324,12 @@ const countryAliases = allCountryAliases();
 function matchCountryAt(tokens, index) {
   for (const item of countryAliases) {
     const part = tokens.slice(index, index + item.alias.length);
-    if (part.join(" ") === item.alias.join(" ")) return item;
+
+    if (part.join(" ") === item.alias.join(" ")) {
+      return item;
+    }
   }
+
   return null;
 }
 
@@ -272,10 +339,7 @@ function parseVoice(text) {
     .replaceAll(".", " ")
     .replaceAll("-", " ");
 
-  console.log("NORMALIZED:", clean);
-
   const tokens = clean.split(" ").filter(Boolean);
-
   const found = new Map();
 
   let currentCountry = null;
@@ -291,16 +355,9 @@ function parseVoice(text) {
 
     const num = numberFromToken(tokens[i]);
 
-    if (
-      currentCountry &&
-      num &&
-      num >= 1 &&
-      num <= 20
-    ) {
+    if (currentCountry && num && num >= 1 && num <= 20) {
       const valid = stickers.some(
-        s =>
-          s.country === currentCountry &&
-          s.number === num
+        sticker => sticker.country === currentCountry && sticker.number === num
       );
 
       if (valid) {
@@ -322,6 +379,8 @@ function parseVoice(text) {
 async function startVoiceRecording(event) {
   event.preventDefault();
 
+  if (isRecording) return;
+
   try {
     await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -336,8 +395,7 @@ async function startVoiceRecording(event) {
   }
 
   const SpeechRecognition =
-    window.SpeechRecognition ||
-    window.webkitSpeechRecognition;
+    window.SpeechRecognition || window.webkitSpeechRecognition;
 
   if (!SpeechRecognition) {
     showToast("Seu navegador não suporta voz");
@@ -346,20 +404,13 @@ async function startVoiceRecording(event) {
 
   voiceTranscript = "";
   isRecording = true;
-
   setRecordingUI(true);
 
   activeRecognition = new SpeechRecognition();
-
   activeRecognition.lang = "pt-BR";
-
-  // MELHORIAS IMPORTANTES
   activeRecognition.continuous = true;
   activeRecognition.interimResults = true;
   activeRecognition.maxAlternatives = 5;
-
-  // MAIS TEMPO ESCUTANDO
-  activeRecognition.serviceURI = "";
 
   let finalTranscript = "";
 
@@ -367,33 +418,24 @@ async function startVoiceRecording(event) {
     showToast("Ouvindo...");
   };
 
-  activeRecognition.onresult = (event) => {
+  activeRecognition.onresult = event => {
     let interim = "";
 
     for (let i = event.resultIndex; i < event.results.length; i++) {
-      const transcript =
-        event.results[i][0].transcript;
+      const transcript = event.results[i][0].transcript;
 
       if (event.results[i].isFinal) {
         finalTranscript += transcript + " ";
       } else {
-        interim += transcript;
+        interim += transcript + " ";
       }
     }
 
-    voiceTranscript =
-      (finalTranscript + " " + interim).trim();
-
-    console.log("VOICE:", voiceTranscript);
+    voiceTranscript = `${finalTranscript} ${interim}`.trim();
   };
 
-  activeRecognition.onerror = (event) => {
-    console.log("VOICE ERROR:", event.error);
-
-    if (
-      event.error === "aborted" ||
-      event.error === "no-speech"
-    ) {
+  activeRecognition.onerror = event => {
+    if (event.error === "aborted" || event.error === "no-speech") {
       return;
     }
 
@@ -403,38 +445,15 @@ async function startVoiceRecording(event) {
 
   activeRecognition.onend = () => {
     if (isRecording) return;
-
     finishVoiceRecording();
   };
 
   try {
     activeRecognition.start();
   } catch (err) {
-    console.log(err);
     showToast("Erro ao iniciar voz");
+    cleanupVoice();
   }
-}
-
-function showToast(text) {
-  let toast = document.getElementById("toast");
-
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.id = "toast";
-    toast.className = "toast hidden";
-    document.body.appendChild(toast);
-  }
-
-  toast.textContent = text;
-  toast.classList.remove("hidden");
-  toast.classList.add("show");
-
-  clearTimeout(window.toastTimer);
-
-  window.toastTimer = setTimeout(() => {
-    toast.classList.add("hidden");
-    toast.classList.remove("show");
-  }, 2500);
 }
 
 function stopVoiceRecording(event) {
@@ -444,18 +463,20 @@ function stopVoiceRecording(event) {
 
   isRecording = false;
 
-  try {
-    activeRecognition.stop();
-  } catch (err) {}
+  if (activeRecognition) {
+    try {
+      activeRecognition.stop();
+    } catch (err) {}
+  }
 
   setTimeout(() => {
     finishVoiceRecording();
-  }, 250);
+  }, 280);
 }
 
 function cleanupVoice() {
-  isRecording = false;
   setRecordingUI(false);
+  isRecording = false;
 
   if (activeRecognition) {
     try {
@@ -467,48 +488,30 @@ function cleanupVoice() {
 }
 
 function finishVoiceRecording() {
-  const recognition = activeRecognition;
+  const transcript = voiceTranscript.trim();
 
   cleanupVoice();
 
-  if (recognition) {
-    try {
-      ignoreNextEnd = true;
-      recognition.stop();
-    } catch (error) {}
-  }
-
-  // AQUI ESTAVA O ERRO
-  if (!voiceTranscript || voiceTranscript.length < 3) {
+  if (!transcript || transcript.length < 3) {
     showToast("Não ouvi nada. Segure o botão, fale e solte.");
     return;
   }
 
-  selectedVoiceItems = parseVoice(voiceTranscript);
-
-  if (selectedVoiceItems.length === 0) {
-    showToast(
-      'Não detectei figurinhas. Exemplo: "Brasil 2 Brasil 3 Brasil 4".'
-    );
-    return;
-  }
-
-  openVoiceModal(voiceTranscript);
-}
-  selectedVoiceItems = parseVoice(voiceTranscript);
+  selectedVoiceItems = parseVoice(transcript);
 
   if (selectedVoiceItems.length === 0) {
     showToast('Não detectei figurinhas. Exemplo: "Brasil 2 Brasil 3 Brasil 4".');
     return;
   }
 
-  openVoiceModal(voiceTranscript);
+  openVoiceModal(transcript);
 }
 
 function openVoiceModal(transcript) {
   document.getElementById("voiceModal").classList.remove("hidden");
   document.getElementById("modalTitle").textContent = "Conferir gravação";
   document.getElementById("modalText").textContent = `Entendi: “${transcript}”`;
+
   renderModalNumbers();
 }
 
@@ -519,18 +522,25 @@ function renderModalNumbers() {
   selectedVoiceItems.forEach(item => {
     const group = document.createElement("div");
     group.className = "modal-group";
-    group.innerHTML = `<strong>${item.country}</strong><div class="modal-numbers"></div>`;
+
+    group.innerHTML = `
+      <strong>${item.country}</strong>
+      <div class="modal-numbers"></div>
+    `;
 
     const numbers = group.querySelector(".modal-numbers");
+
     item.numbers.forEach(number => {
       const button = document.createElement("button");
       button.className = "modal-num selected";
       button.textContent = number;
+
       button.onclick = () => {
         item.numbers = item.numbers.filter(n => n !== number);
         selectedVoiceItems = selectedVoiceItems.filter(group => group.numbers.length > 0);
         renderModalNumbers();
       };
+
       numbers.appendChild(button);
     });
 
@@ -541,12 +551,19 @@ function renderModalNumbers() {
 function confirmModalNumbers() {
   selectedVoiceItems.forEach(item => {
     item.numbers.forEach(number => {
-      const sticker = stickers.find(s => s.country === item.country && s.number === number);
+      const sticker = stickers.find(
+        sticker => sticker.country === item.country && sticker.number === number
+      );
+
       if (!sticker) return;
 
       const status = statusOf(sticker.id);
-      if (status.owned) status.duplicates++;
-      else status.owned = true;
+
+      if (status.owned) {
+        status.duplicates++;
+      } else {
+        status.owned = true;
+      }
     });
   });
 
@@ -560,10 +577,56 @@ function closeModal() {
   selectedVoiceItems = [];
 }
 
-document.getElementById("nextBtn").onclick = () => { page = "repetidas"; render(); };
-document.getElementById("backBtn").onclick = () => { page = "colecao"; render(); };
+async function requestMicPermission() {
+  try {
+    await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    const permissionBox = document.getElementById("micPermission");
+
+    if (permissionBox) {
+      permissionBox.classList.add("hidden");
+    }
+
+    showToast("Microfone ativado");
+  } catch (err) {
+    showToast("Permissão negada");
+  }
+}
+
+async function checkMicPermission() {
+  const permissionBox = document.getElementById("micPermission");
+
+  if (!permissionBox) return;
+
+  if (!navigator.permissions) return;
+
+  try {
+    const result = await navigator.permissions.query({
+      name: "microphone"
+    });
+
+    if (result.state === "granted") {
+      permissionBox.classList.add("hidden");
+    } else {
+      permissionBox.classList.remove("hidden");
+    }
+  } catch (err) {
+    permissionBox.classList.remove("hidden");
+  }
+}
+
+document.getElementById("nextBtn").onclick = () => {
+  page = "repetidas";
+  render();
+};
+
+document.getElementById("backBtn").onclick = () => {
+  page = "colecao";
+  render();
+};
 
 const voiceBtn = document.getElementById("voiceBtn");
+
 voiceBtn.addEventListener("pointerdown", startVoiceRecording);
 voiceBtn.addEventListener("pointerup", stopVoiceRecording);
 voiceBtn.addEventListener("pointercancel", stopVoiceRecording);
@@ -574,5 +637,11 @@ voiceBtn.addEventListener("pointerleave", event => {
 document.getElementById("modalConfirm").onclick = confirmModalNumbers;
 document.getElementById("modalClose").onclick = closeModal;
 
-render();
+const enableMicBtn = document.getElementById("enableMicBtn");
 
+if (enableMicBtn) {
+  enableMicBtn.addEventListener("click", requestMicPermission);
+}
+
+checkMicPermission();
+render();
