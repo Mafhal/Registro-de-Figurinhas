@@ -486,22 +486,38 @@ function finishVoiceRecording() {
   openVoiceModal(transcript);
 }
 
-function stopVoiceRecording(event) {
-  event.preventDefault();
 
-  if (!isRecording) return;
-
+function cleanupVoice() {
+  setRecordingUI(false);
   isRecording = false;
 
   if (activeRecognition) {
     try {
-      activeRecognition.stop();
+      activeRecognition.abort();
     } catch (err) {}
   }
 
-  setTimeout(() => {
-    finishVoiceRecording();
-  }, 280);
+  activeRecognition = null;
+}
+
+function finishVoiceRecording() {
+  const transcript = voiceTranscript.trim();
+
+  cleanupVoice();
+
+  if (!transcript || transcript.length < 3) {
+    showToast("Não ouvi nada. Segure o botão, fale e solte.");
+    return;
+  }
+
+  selectedVoiceItems = parseVoice(transcript);
+
+  if (selectedVoiceItems.length === 0) {
+    showToast('Não detectei figurinhas. Exemplo: "Brasil 2 Brasil 3 Brasil 4".');
+    return;
+  }
+
+  openVoiceModal(transcript);
 }
 
 function cleanupVoice() {
