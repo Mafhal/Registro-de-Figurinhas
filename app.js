@@ -468,6 +468,7 @@ function cleanupVoice() {
 
 function finishVoiceRecording() {
   const recognition = activeRecognition;
+
   cleanupVoice();
 
   if (recognition) {
@@ -477,11 +478,23 @@ function finishVoiceRecording() {
     } catch (error) {}
   }
 
-  if (!voiceTranscript || voiceTranscript.length < 3)
+  // AQUI ESTAVA O ERRO
+  if (!voiceTranscript || voiceTranscript.length < 3) {
     showToast("Não ouvi nada. Segure o botão, fale e solte.");
     return;
   }
 
+  selectedVoiceItems = parseVoice(voiceTranscript);
+
+  if (selectedVoiceItems.length === 0) {
+    showToast(
+      'Não detectei figurinhas. Exemplo: "Brasil 2 Brasil 3 Brasil 4".'
+    );
+    return;
+  }
+
+  openVoiceModal(voiceTranscript);
+}
   selectedVoiceItems = parseVoice(voiceTranscript);
 
   if (selectedVoiceItems.length === 0) {
