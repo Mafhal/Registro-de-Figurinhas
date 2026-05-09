@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Figurinhas 2026</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+
+<body>
+  <div id="recordingFrame" class="recording-frame hidden"></div>
+
+  <header class="topbar">
+    <button id="backBtn" class="arrow hidden" aria-label="Voltar">‹</button>
+
+    <div class="header-center">
+      <h1 id="title">Figurinhas 2026</h1>
+      <div id="albumProgress" class="album-progress">0/0 • 0%</div>
+    </div>
+
+    <button id="nextBtn" class="arrow" aria-label="Repetidas">›</button>
+  </header>
+
+  <main id="app"></main>
+
+  <button id="voiceBtn" class="voice-fab" aria-label="Segurar para gravar">
+    <span class="mic-icon">🎙️</span>
+  </button>
+
+  <div id="voiceStatus" class="voice-status hidden">Gravando...</div>
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="voiceModal" class="modal hidden">
+    <div class="modal-card">
+      <h2 id="modalTitle">Conferir gravação</h2>
+      <p id="modalText">Confira as figurinhas detectadas antes de marcar.</p>
+
+      <div id="modalGrid" class="modal-grid"></div>
+
+      <div class="modal-actions">
+        <button id="modalConfirm">Confirmar e marcar</button>
+        <button id="modalClose">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
