@@ -431,20 +431,44 @@ function buildPdfHtml(type) {
 </html>`;
 }
 
-function exportPdf(type) {
-  const html = buildPdfHtml(type);
-  const pdfWindow = window.open("", "_blank");
-
-  if (!pdfWindow) {
-    showToast("Permita pop-ups para exportar o PDF.");
-    return;
-  }
-
-  pdfWindow.document.open();
-  pdfWindow.document.write(html);
-  pdfWindow.document.close();
+function exportJson() {
+  const dataStr = JSON.stringify(collection, null, 2);
+  const dataBlob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(dataBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'figurinhas2026.json';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
   closeExportModal();
-  showToast("PDF aberto. Escolha salvar como PDF na janela de impressão.");
+  showToast('JSON exportado com sucesso.');
+}
+
+function importJson() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const imported = JSON.parse(e.target.result);
+        collection = imported;
+        save();
+        render();
+        closeExportModal();
+        showToast('JSON importado com sucesso.');
+      } catch (error) {
+        showToast('Erro ao importar JSON: formato inválido.');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
 }
 
 document.getElementById("nextBtn").onclick = () => {
@@ -474,6 +498,9 @@ if (exportBtn) {
 document.getElementById("exportAllBtn").onclick = () => exportPdf("all");
 document.getElementById("exportMissingBtn").onclick = () => exportPdf("missing");
 document.getElementById("exportCloseBtn").onclick = closeExportModal;
+
+document.getElementById("exportJsonBtn").onclick = exportJson;
+document.getElementById("importJsonBtn").onclick = importJson;
 
 document.getElementById("exportModal").addEventListener("click", event => {
   if (event.target.id === "exportModal") closeExportModal();
