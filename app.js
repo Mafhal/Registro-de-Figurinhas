@@ -431,6 +431,34 @@ function buildPdfHtml(type) {
 </html>`;
 }
 
+function exportPdf(type) {
+  const html = buildPdfHtml(type);
+  const pdfWindow = window.open("", "_blank");
+
+  if (pdfWindow) {
+    pdfWindow.document.open();
+    pdfWindow.document.write(html);
+    pdfWindow.document.close();
+    closeExportModal();
+    showToast("PDF aberto. Escolha salvar como PDF na janela de impressão.");
+    return;
+  }
+
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  closeExportModal();
+  showToast("Tentando abrir o PDF. Se não funcionar, permita pop-ups no navegador.");
+}
+
 function exportJson() {
   const dataStr = JSON.stringify(collection, null, 2);
   const dataBlob = new Blob([dataStr], { type: 'application/json' });
