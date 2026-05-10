@@ -382,30 +382,32 @@ function buildPdfHtml(type) {
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, orientation=landscape" />
   <title>${escapeHtml(title)} - Figurinhas 2026</title>
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; color: #221f18; background: #fff; }
-    .pdf-page { padding: 6px; }
-    .pdf-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; border-bottom: 1px solid #237c4f; padding-bottom: 4px; margin-bottom: 4px; }
-    .pdf-header h1 { margin: 0; font-size: 13px; line-height: 1; }
-    .pdf-header p { margin: 0; color: #6d6557; font-size: 7px; font-weight: 700; line-height: 1.15; text-align: right; }
-    .pdf-category { margin: 0 0 3px; break-inside: avoid; page-break-inside: avoid; }
-    .pdf-category h2 { margin: 0 0 2px; padding: 1px 4px; border-radius: 4px; background: #237c4f; color: #fff; font-size: 8px; line-height: 1.2; }
+    .pdf-page { padding: 4px; }
+    .pdf-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; border-bottom: 1px solid #237c4f; padding-bottom: 3px; margin-bottom: 3px; }
+    .pdf-header h1 { margin: 0; font-size: 12px; line-height: 1; }
+    .pdf-header p { margin: 0; color: #6d6557; font-size: 6px; font-weight: 700; line-height: 1.15; text-align: right; }
+    .pdf-category { margin: 0 0 12px; break-inside: avoid; page-break-inside: avoid; }
+    .pdf-category h2 { margin: 0 0 2px; padding: 1px 3px; border-radius: 4px; background: #237c4f; color: #fff; font-size: 7px; line-height: 1.2; }
     .pdf-countries { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 4px; }
-    .pdf-country { display: grid; grid-template-columns: 60px 1fr; align-items: center; gap: 2px; border: 1px solid #e5dbc4; border-radius: 4px; padding: 2px; min-height: 15px; break-inside: avoid; page-break-inside: avoid; }
-    .pdf-country h3 { margin: 0; font-size: 6px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .pdf-grid { display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 1px; }
-    .pdf-sticker { height: 10px; border-radius: 2px; border: 0.5px solid #d6cab0; display: grid; place-items: center; position: relative; background: #fff; color: #221f18; }
+    .pdf-country { display: grid; grid-template-columns: 55px 1fr; align-items: center; gap: 2px; border: 1px solid #e5dbc4; border-radius: 4px; padding: 2px; min-height: 15px; break-inside: avoid; page-break-inside: avoid; }
+    .pdf-country h3 { margin: 0; font-size: 7px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 900; }
+    .pdf-grid { display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 2px; }
+    .pdf-sticker { height: 16px; border-radius: 2px; border: 0.5px solid #d6cab0; display: grid; place-items: center; position: relative; background: #fff; color: #221f18; }
     .pdf-sticker.owned { background: #eaf6ee; color: #237c4f; border-color: #a8dabc; }
     .pdf-sticker.missing { background: #fff; color: #221f18; border-color: #d7c9a8; }
-    .pdf-sticker strong { font-size: 6px; line-height: 1; }
-    .pdf-sticker small { position: absolute; top: -3px; right: -2px; background: #d94a38; color: white; border-radius: 999px; min-width: 7px; height: 7px; display: grid; place-items: center; font-size: 4px; font-weight: 900; }
+    .pdf-sticker strong { font-size: 8px; line-height: 1; font-weight: 900; }
+    .pdf-sticker small { position: absolute; top: -3px; right: -2px; background: #d94a38; color: white; border-radius: 999px; min-width: 6px; height: 6px; display: grid; place-items: center; font-size: 3px; font-weight: 900; }
     .empty { border: 1px solid #eadfc2; border-radius: 8px; padding: 8px; font-weight: 800; font-size: 10px; }
-    @page { size: A4 landscape; margin: 4mm; }
+    @page { size: A4 landscape; margin: 3mm; }
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      html { width: 100vw; height: 100vh; }
       .pdf-page { padding: 0; }
     }
   </style>
