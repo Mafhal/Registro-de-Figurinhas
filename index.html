@@ -7,10 +7,7 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 
-
 <body>
-  <div id="recordingFrame" class="recording-frame hidden"></div>
-
   <header class="topbar">
     <button id="backBtn" class="arrow hidden" aria-label="Voltar">‹</button>
 
@@ -20,27 +17,27 @@
     </div>
 
     <button id="nextBtn" class="arrow" aria-label="Repetidas">›</button>
+
+    <div class="header-actions" aria-label="Ferramentas">
+      <input id="hideOwnedToggle" class="hide-toggle" type="checkbox" />
+
+      <button id="exportBtn" class="export-btn" type="button">PDF</button>
+    </div>
   </header>
 
   <main id="app"></main>
 
-  <button id="voiceBtn" class="voice-fab" aria-label="Segurar para gravar">
-    <span class="mic-icon">🎙️</span>
-  </button>
-
-  <div id="voiceStatus" class="voice-status hidden">Gravando...</div>
   <div id="toast" class="toast hidden"></div>
 
-  <div id="voiceModal" class="modal hidden">
+  <div id="exportModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
     <div class="modal-card">
-      <h2 id="modalTitle">Conferir gravação</h2>
-      <p id="modalText">Confira as figurinhas detectadas antes de marcar.</p>
-
-      <div id="modalGrid" class="modal-grid"></div>
+      <h2 id="exportTitle">PDF</h2>
+      <p>Escolha o que você quer colocar no PDF. Ele será gerado em ordem por categoria, seleção e número.</p>
 
       <div class="modal-actions">
-        <button id="modalConfirm">Confirmar e marcar</button>
-        <button id="modalClose">Fechar</button>
+        <button id="exportAllBtn" type="button">Exportar todas</button>
+        <button id="exportMissingBtn" type="button">Exportar faltantes</button>
+        <button id="exportCloseBtn" type="button">Fechar</button>
       </div>
     </div>
   </div>

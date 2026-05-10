@@ -30,16 +30,22 @@ for (let i = 1; i <= 14; i++) {
 }
 
 let page = "colecao";
-let selectedVoiceItems = [];
 let lastPointerDown = 0;
 let holdTimer = null;
-let activeRecognition = null;
-let voiceTranscript = "";
-let isRecording = false;
 let toastTimer = null;
 
-let collection = JSON.parse(localStorage.getItem("figurinhas2026")) || {};
-let collapsedCards = JSON.parse(localStorage.getItem("figurinhas2026Collapsed")) || {};
+// Mantém a mesma chave do app antigo para ninguém perder os saves.
+let collection = safeJsonParse(localStorage.getItem("figurinhas2026"), {});
+let collapsedCards = safeJsonParse(localStorage.getItem("figurinhas2026Collapsed"), {});
+let hideOwned = safeJsonParse(localStorage.getItem("figurinhas2026OcultarColadas"), false);
+
+function safeJsonParse(value, fallback) {
+  try {
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 function save() {
   localStorage.setItem("figurinhas2026", JSON.stringify(collection));
@@ -49,10 +55,17 @@ function saveCollapsedCards() {
   localStorage.setItem("figurinhas2026Collapsed", JSON.stringify(collapsedCards));
 }
 
+function saveHideOwned() {
+  localStorage.setItem("figurinhas2026OcultarColadas", JSON.stringify(hideOwned));
+}
+
 function statusOf(id) {
   if (!collection[id]) {
     collection[id] = { owned: false, duplicates: 0 };
   }
+
+  if (typeof collection[id].owned !== "boolean") collection[id].owned = false;
+  if (typeof collection[id].duplicates !== "number") collection[id].duplicates = 0;
 
   return collection[id];
 }
@@ -74,23 +87,33 @@ function showToast(message) {
   }, 2600);
 }
 
-function setRecordingUI(active) {
-  document.getElementById("voiceBtn").classList.toggle("recording", active);
-  document.getElementById("voiceStatus").classList.toggle("hidden", !active);
-  document.getElementById("recordingFrame").classList.toggle("hidden", !active);
-}
-
 function updateAlbumProgress() {
   const total = stickers.length;
   const owned = stickers.filter(sticker => statusOf(sticker.id).owned).length;
+  const missing = total - owned;
   const percent = total === 0 ? 0 : Math.round((owned / total) * 100);
 
   document.getElementById("albumProgress").textContent =
-    `${owned}/${total} figurinhas • ${percent}% completo`;
+    `${owned}/${total} coladas • ${missing} faltantes • ${percent}%`;
+}
+
+function updateControls() {
+  const hideOwnedToggle = document.getElementById("hideOwnedToggle");
+  const exportBtn = document.getElementById("exportBtn");
+
+  if (hideOwnedToggle) {
+    hideOwnedToggle.checked = hideOwned;
+    hideOwnedToggle.disabled = page !== "colecao";
+  }
+
+  if (exportBtn) {
+    exportBtn.disabled = false;
+  }
 }
 
 function render() {
   updateAlbumProgress();
+  updateControls();
 
   document.getElementById("title").textContent =
     page === "colecao" ? "Figurinhas 2026" : "Repetidas";
@@ -102,12 +125,16 @@ function render() {
   app.innerHTML = "";
 
   const categories = [...new Set(stickers.map(sticker => sticker.category))];
+  let renderedCards = 0;
 
   categories.forEach(category => {
+    const categoryWrap = document.createElement("div");
+    categoryWrap.className = "category-wrap";
+
     const categoryTitle = document.createElement("h2");
     categoryTitle.className = "category-title";
     categoryTitle.textContent = category;
-    app.appendChild(categoryTitle);
+    categoryWrap.appendChild(categoryTitle);
 
     const countries = [
       ...new Set(
@@ -117,6 +144,8 @@ function render() {
       )
     ];
 
+    let cardsInCategory = 0;
+
     countries.forEach(country => {
       const countryStickers = stickers.filter(
         sticker => sticker.category === category && sticker.country === country
@@ -124,13 +153,21 @@ function render() {
 
       const visibleStickers = countryStickers.filter(sticker => {
         const status = statusOf(sticker.id);
-        return page === "colecao" || status.duplicates > 0;
+
+        if (page === "repetidas") return status.duplicates > 0;
+        if (hideOwned) return !status.owned;
+        return true;
       });
 
       if (visibleStickers.length === 0) return;
 
       const ownedCount = countryStickers.filter(sticker => statusOf(sticker.id).owned).length;
+      const missingCount = countryStickers.length - ownedCount;
       const percent = Math.round((ownedCount / countryStickers.length) * 100);
+      const countryCode = countryStickers[0]?.code || countryStickers[0]?.id?.split('-')[0] || "";
+      const countryLabel = category === "Seleções" && countryCode
+        ? `${country} <span class="country-code">• ${countryCode}</span>`
+        : country;
 
       const cardKey = `${category}-${country}`;
       const collapsed = !!collapsedCards[cardKey];
@@ -141,8 +178,8 @@ function render() {
       card.innerHTML = `
         <div class="country-head">
           <div>
-            <div class="country-name">${country}</div>
-            <div class="country-subtitle">${ownedCount} de ${countryStickers.length} completas</div>
+            <h3 class="country-name">${countryLabel}</h3>
+            <div class="country-subtitle">${ownedCount} de ${countryStickers.length} coladas • ${missingCount} faltantes</div>
           </div>
 
           <div class="country-right">
@@ -208,9 +245,24 @@ function render() {
         grid.appendChild(button);
       });
 
-      app.appendChild(card);
+      categoryWrap.appendChild(card);
+      cardsInCategory++;
+      renderedCards++;
     });
+
+    if (cardsInCategory > 0) {
+      app.appendChild(categoryWrap);
+    }
   });
+
+  if (renderedCards === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.innerHTML = page === "repetidas"
+      ? `<strong>Nenhuma repetida por enquanto.</strong><span>Quando tiver repetidas, elas aparecem aqui.</span>`
+      : `<strong>Nenhuma figurinha para mostrar.</strong><span>Desative “Ocultar coladas” para ver todas novamente.</span>`;
+    app.appendChild(empty);
+  }
 }
 
 function clickSticker(sticker) {
@@ -249,358 +301,148 @@ function removeSticker(sticker) {
   render();
 }
 
-function normalizeText(text) {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+function openExportModal() {
+  document.getElementById("exportModal").classList.remove("hidden");
 }
 
-const numberWords = {
-  "um": 1,
-  "uma": 1,
-  "primeiro": 1,
-  "dois": 2,
-  "duas": 2,
-  "segundo": 2,
-  "tres": 3,
-  "terceiro": 3,
-  "quatro": 4,
-  "cinco": 5,
-  "seis": 6,
-  "sete": 7,
-  "oito": 8,
-  "nove": 9,
-  "dez": 10,
-  "onze": 11,
-  "doze": 12,
-  "treze": 13,
-  "quatorze": 14,
-  "catorze": 14,
-  "quinze": 15,
-  "dezesseis": 16,
-  "dezaseis": 16,
-  "dezessete": 17,
-  "dezasete": 17,
-  "dezoito": 18,
-  "dezenove": 19,
-  "vinte": 20
-};
-
-function numberFromToken(token) {
-  if (/^\d+$/.test(token)) return Number(token);
-  return numberWords[token] || null;
+function closeExportModal() {
+  document.getElementById("exportModal").classList.add("hidden");
 }
 
-function allCountryAliases() {
-  const aliases = [];
-
-  teams.forEach(([name, code]) => {
-    aliases.push({
-      country: name,
-      alias: normalizeText(name).split(" ")
-    });
-
-    aliases.push({
-      country: name,
-      alias: [code.toLowerCase()]
-    });
-  });
-
-  aliases.push({ country: "FIFA World Cup", alias: ["fifa"] });
-  aliases.push({ country: "FIFA World Cup", alias: ["world", "cup"] });
-  aliases.push({ country: "Coca-Cola", alias: ["coca"] });
-  aliases.push({ country: "Coca-Cola", alias: ["coca-cola"] });
-  aliases.push({ country: "Coca-Cola", alias: ["cola"] });
-
-  return aliases.sort((a, b) => b.alias.length - a.alias.length);
-}
-
-const countryAliases = allCountryAliases();
-
-function matchCountryAt(tokens, index) {
-  for (const item of countryAliases) {
-    const part = tokens.slice(index, index + item.alias.length);
-
-    if (part.join(" ") === item.alias.join(" ")) {
-      return item;
-    }
-  }
-
-  return null;
-}
-
-function parseVoice(text) {
-  const clean = normalizeText(text)
-    .replaceAll(",", " ")
-    .replaceAll(".", " ")
-    .replaceAll("-", " ");
-
-  const tokens = clean.split(" ").filter(Boolean);
-  const found = new Map();
-
-  let currentCountry = null;
-
-  for (let i = 0; i < tokens.length; i++) {
-    const countryMatch = matchCountryAt(tokens, i);
-
-    if (countryMatch) {
-      currentCountry = countryMatch.country;
-      i += countryMatch.alias.length - 1;
-      continue;
-    }
-
-    const num = numberFromToken(tokens[i]);
-
-    if (currentCountry && num && num >= 1 && num <= 20) {
-      const valid = stickers.some(
-        sticker => sticker.country === currentCountry && sticker.number === num
-      );
-
-      if (valid) {
-        if (!found.has(currentCountry)) {
-          found.set(currentCountry, new Set());
-        }
-
-        found.get(currentCountry).add(num);
-      }
-    }
-  }
-
-  return [...found.entries()].map(([country, set]) => ({
-    country,
-    numbers: [...set].sort((a, b) => a - b)
-  }));
-}
-
-let shouldProcessVoice = false;
-
-async function startVoiceRecording(event) {
-  event.preventDefault();
-
-  if (isRecording) return;
-
-  try {
-    await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch {
-    showToast("Permita acesso ao microfone");
-    return;
-  }
-
-  const SpeechRecognition =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  if (!SpeechRecognition) {
-    showToast("Seu navegador não suporta voz");
-    return;
-  }
-
-  voiceTranscript = "";
-  shouldProcessVoice = false;
-  isRecording = true;
-  setRecordingUI(true);
-
-  activeRecognition = new SpeechRecognition();
-  activeRecognition.lang = "pt-BR";
-  activeRecognition.continuous = true;
-  activeRecognition.interimResults = true;
-  activeRecognition.maxAlternatives = 1;
-
-  activeRecognition.onstart = () => {
-    showToast("Gravando... toque novamente para parar");
-  };
-
-  activeRecognition.onresult = event => {
-    let text = "";
-
-    for (let i = 0; i < event.results.length; i++) {
-      text += event.results[i][0].transcript + " ";
-    }
-
-    voiceTranscript = text.trim();
-    console.log("OUVI:", voiceTranscript);
-  };
-
-  activeRecognition.onerror = event => {
-    console.log("ERRO VOZ:", event.error);
-
-    if (event.error !== "no-speech" && event.error !== "aborted") {
-      showToast("Erro no microfone: " + event.error);
-    }
-  };
-
-  activeRecognition.onend = () => {
-    if (isRecording && !shouldProcessVoice) {
-      try {
-        activeRecognition.start();
-      } catch {}
-      return;
-    }
-
-    if (shouldProcessVoice) {
-      finishVoiceRecording();
-    }
-  };
-
-  try {
-    activeRecognition.start();
-  } catch {
-    showToast("Erro ao iniciar microfone");
-    cleanupVoice();
-  }
-}
-
-function stopVoiceRecording(event) {
-  event.preventDefault();
-
-  if (!isRecording || !activeRecognition) return;
-
-  shouldProcessVoice = true;
-  showToast("Interpretando...");
-
-  try {
-    activeRecognition.stop();
-  } catch {
-    finishVoiceRecording();
-  }
-}
-
-function cleanupVoice() {
-  setRecordingUI(false);
-  isRecording = false;
-  shouldProcessVoice = false;
-  activeRecognition = null;
-}
-
-function finishVoiceRecording() {
-  const transcript = voiceTranscript.trim();
-
-  cleanupVoice();
-
-  if (!transcript || transcript.length < 2) {
-    showToast("Não ouvi nada. Tente novamente.");
-    return;
-  }
-
-  selectedVoiceItems = parseVoice(transcript);
-
-  if (selectedVoiceItems.length === 0) {
-    showToast(`Ouvi: "${transcript}", mas não achei figurinhas.`);
-    return;
-  }
-
-  openVoiceModal(transcript);
-}
-
-function openVoiceModal(transcript) {
-  document.getElementById("voiceModal").classList.remove("hidden");
-  document.getElementById("modalTitle").textContent = "Conferir gravação";
-  document.getElementById("modalText").textContent = `Entendi: “${transcript}”`;
-
-  renderModalNumbers();
-}
-
-function renderModalNumbers() {
-  const grid = document.getElementById("modalGrid");
-  grid.innerHTML = "";
-
-  selectedVoiceItems.forEach(item => {
-    const group = document.createElement("div");
-    group.className = "modal-group";
-
-    group.innerHTML = `
-      <strong>${item.country}</strong>
-      <div class="modal-numbers"></div>
-    `;
-
-    const numbers = group.querySelector(".modal-numbers");
-
-    item.numbers.forEach(number => {
-      const button = document.createElement("button");
-      button.className = "modal-num selected";
-      button.textContent = number;
-
-      button.onclick = () => {
-        item.numbers = item.numbers.filter(n => n !== number);
-        selectedVoiceItems = selectedVoiceItems.filter(group => group.numbers.length > 0);
-        renderModalNumbers();
-      };
-
-      numbers.appendChild(button);
-    });
-
-    grid.appendChild(group);
+function stickersForExport(type) {
+  return stickers.filter(sticker => {
+    const status = statusOf(sticker.id);
+    return type === "missing" ? !status.owned : true;
   });
 }
 
-function confirmModalNumbers() {
-  selectedVoiceItems.forEach(item => {
-    item.numbers.forEach(number => {
-      const sticker = stickers.find(
-        sticker => sticker.country === item.country && sticker.number === number
-      );
+function groupedExportData(type) {
+  const items = stickersForExport(type);
+  const categories = [...new Set(items.map(sticker => sticker.category))];
 
-      if (!sticker) return;
+  return categories.map(category => {
+    const categoryItems = items.filter(sticker => sticker.category === category);
+    const countries = [...new Set(categoryItems.map(sticker => sticker.country))];
 
-      const status = statusOf(sticker.id);
-
-      if (status.owned) {
-        status.duplicates++;
-      } else {
-        status.owned = true;
-      }
-    });
+    return {
+      category,
+      countries: countries.map(country => ({
+        country,
+        stickers: categoryItems
+          .filter(sticker => sticker.country === country)
+          .sort((a, b) => a.number - b.number)
+      }))
+    };
   });
-
-  save();
-  closeModal();
-  render();
 }
 
-function closeModal() {
-  document.getElementById("voiceModal").classList.add("hidden");
-  selectedVoiceItems = [];
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-async function requestMicPermission() {
-  try {
-    await navigator.mediaDevices.getUserMedia({ audio: true });
+function buildPdfHtml(type) {
+  const total = stickers.length;
+  const owned = stickers.filter(sticker => statusOf(sticker.id).owned).length;
+  const missing = total - owned;
+  const exportItems = stickersForExport(type);
+  const groups = groupedExportData(type);
+  const title = type === "missing" ? "Figurinhas faltantes" : "Todas as figurinhas";
+  const today = new Date().toLocaleDateString("pt-BR");
 
-    const permissionBox = document.getElementById("micPermission");
+  const groupsHtml = groups.map(group => `
+    <section class="pdf-category">
+      <h2>${escapeHtml(group.category)}</h2>
+      <div class="pdf-countries">
+        ${group.countries.map(countryGroup => `
+          <div class="pdf-country">
+            <h3>${escapeHtml(countryGroup.country)}</h3>
+            <div class="pdf-grid">
+              ${countryGroup.stickers.map(sticker => {
+                const status = statusOf(sticker.id);
+                return `
+                  <div class="pdf-sticker ${status.owned ? "owned" : "missing"}">
+                    <strong>${sticker.number}</strong>
+                    ${status.duplicates > 0 ? `<small>+${status.duplicates}</small>` : ""}
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `).join("");
 
-    if (permissionBox) {
-      permissionBox.classList.add("hidden");
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>${escapeHtml(title)} - Figurinhas 2026</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; color: #221f18; background: #fff; }
+    .pdf-page { padding: 6px; }
+    .pdf-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; border-bottom: 1px solid #237c4f; padding-bottom: 4px; margin-bottom: 4px; }
+    .pdf-header h1 { margin: 0; font-size: 13px; line-height: 1; }
+    .pdf-header p { margin: 0; color: #6d6557; font-size: 7px; font-weight: 700; line-height: 1.15; text-align: right; }
+    .pdf-category { margin: 0 0 3px; break-inside: avoid; page-break-inside: avoid; }
+    .pdf-category h2 { margin: 0 0 2px; padding: 1px 4px; border-radius: 4px; background: #237c4f; color: #fff; font-size: 8px; line-height: 1.2; }
+    .pdf-countries { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 4px; }
+    .pdf-country { display: grid; grid-template-columns: 60px 1fr; align-items: center; gap: 2px; border: 1px solid #e5dbc4; border-radius: 4px; padding: 2px; min-height: 15px; break-inside: avoid; page-break-inside: avoid; }
+    .pdf-country h3 { margin: 0; font-size: 6px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pdf-grid { display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 1px; }
+    .pdf-sticker { height: 10px; border-radius: 2px; border: 0.5px solid #d6cab0; display: grid; place-items: center; position: relative; background: #fff; color: #221f18; }
+    .pdf-sticker.owned { background: #eaf6ee; color: #237c4f; border-color: #a8dabc; }
+    .pdf-sticker.missing { background: #fff; color: #221f18; border-color: #d7c9a8; }
+    .pdf-sticker strong { font-size: 6px; line-height: 1; }
+    .pdf-sticker small { position: absolute; top: -3px; right: -2px; background: #d94a38; color: white; border-radius: 999px; min-width: 7px; height: 7px; display: grid; place-items: center; font-size: 4px; font-weight: 900; }
+    .empty { border: 1px solid #eadfc2; border-radius: 8px; padding: 8px; font-weight: 800; font-size: 10px; }
+    @page { size: A4 landscape; margin: 4mm; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .pdf-page { padding: 0; }
     }
+  </style>
+</head>
+<body>
+  <main class="pdf-page">
+    <section class="pdf-header">
+      <h1>${escapeHtml(title)}</h1>
+      <p>Figurinhas 2026 • ${today}<br>Total ${total} • Coladas ${owned} • Faltantes ${missing} • PDF ${exportItems.length}</p>
+    </section>
 
-    showToast("Microfone ativado");
-  } catch (err) {
-    showToast("Permissão negada");
-  }
-}
+    ${exportItems.length > 0 ? groupsHtml : `<div class="empty">Nenhuma figurinha para exportar.</div>`}
+  </main>
 
-async function checkMicPermission() {
-  const permissionBox = document.getElementById("micPermission");
-
-  if (!permissionBox) return;
-
-  if (!navigator.permissions) return;
-
-  try {
-    const result = await navigator.permissions.query({
-      name: "microphone"
+  <script>
+    window.addEventListener("load", () => {
+      setTimeout(() => window.print(), 350);
     });
+  <\/script>
+</body>
+</html>`;
+}
 
-    if (result.state === "granted") {
-      permissionBox.classList.add("hidden");
-    } else {
-      permissionBox.classList.remove("hidden");
-    }
-  } catch (err) {
-    permissionBox.classList.remove("hidden");
+function exportPdf(type) {
+  const html = buildPdfHtml(type);
+  const pdfWindow = window.open("", "_blank");
+
+  if (!pdfWindow) {
+    showToast("Permita pop-ups para exportar o PDF.");
+    return;
   }
+
+  pdfWindow.document.open();
+  pdfWindow.document.write(html);
+  pdfWindow.document.close();
+  closeExportModal();
+  showToast("PDF aberto. Escolha salvar como PDF na janela de impressão.");
 }
 
 document.getElementById("nextBtn").onclick = () => {
@@ -613,20 +455,26 @@ document.getElementById("backBtn").onclick = () => {
   render();
 };
 
-const voiceBtn = document.getElementById("voiceBtn");
-
-voiceBtn.addEventListener("click", event => {
-  startVoiceRecording(event);
-});
-
-document.getElementById("modalConfirm").onclick = confirmModalNumbers;
-document.getElementById("modalClose").onclick = closeModal;
-
-const enableMicBtn = document.getElementById("enableMicBtn");
-
-if (enableMicBtn) {
-  enableMicBtn.addEventListener("click", requestMicPermission);
+const hideOwnedToggle = document.getElementById("hideOwnedToggle");
+if (hideOwnedToggle) {
+  hideOwnedToggle.addEventListener("change", event => {
+    hideOwned = event.target.checked;
+    saveHideOwned();
+    render();
+  });
 }
 
-checkMicPermission();
+const exportBtn = document.getElementById("exportBtn");
+if (exportBtn) {
+  exportBtn.addEventListener("click", openExportModal);
+}
+
+document.getElementById("exportAllBtn").onclick = () => exportPdf("all");
+document.getElementById("exportMissingBtn").onclick = () => exportPdf("missing");
+document.getElementById("exportCloseBtn").onclick = closeExportModal;
+
+document.getElementById("exportModal").addEventListener("click", event => {
+  if (event.target.id === "exportModal") closeExportModal();
+});
+
 render();
