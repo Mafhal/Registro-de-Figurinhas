@@ -9,18 +9,20 @@
 
 <body>
   <header class="topbar">
-    <button id="backBtn" class="arrow hidden" aria-label="Voltar">‹</button>
-
     <div class="header-center">
       <h1 id="title">Figurinhas 2026</h1>
       <div id="albumProgress" class="album-progress">0/0 • 0%</div>
     </div>
 
-    <button id="nextBtn" class="arrow" aria-label="Repetidas">›</button>
-
     <div class="header-actions" aria-label="Ferramentas">
-      <input id="hideOwnedToggle" class="hide-toggle" type="checkbox" />
-
+      <div class="toggle-group">
+        <span class="toggle-label">A–Z</span>
+        <input id="sortAlphaToggle" class="hide-toggle" type="checkbox" />
+      </div>
+      <div class="toggle-group">
+        <span class="toggle-label">Ocultar</span>
+        <input id="hideOwnedToggle" class="hide-toggle" type="checkbox" />
+      </div>
       <button id="exportBtn" class="export-btn" type="button">PDF</button>
     </div>
   </header>
@@ -32,8 +34,7 @@
   <div id="exportModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
     <div class="modal-card">
       <h2 id="exportTitle">PDF</h2>
-      <p>Escolha o que você quer colocar no PDF. Ele será gerado em ordem por categoria, seleção e número.</p>
-
+      <p>Escolha o que você quer colocar no PDF. Ele será gerado em ordem alfabética por time.</p>
       <div class="modal-actions">
         <button id="exportAllBtn" type="button">Exportar todas</button>
         <button id="exportMissingBtn" type="button">Exportar faltantes</button>
