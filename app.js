@@ -17,9 +17,17 @@ const teams = [
 
 teams.forEach(([country, code]) => {
   for (let i = 1; i <= 20; i++) {
-    stickers.push({ id: `${code}-${i}`, country, code, number: i });
+    stickers.push({ id: `${code}-${i}`, category: "Seleções", country, code, number: i });
   }
 });
+
+for (let i = 1; i <= 20; i++) {
+  stickers.push({ id: `FWC-${i}`, category: "FIFA", country: "FIFA World Cup", code: "FWC", number: i });
+}
+
+for (let i = 1; i <= 14; i++) {
+  stickers.push({ id: `CC-${i}`, category: "Coca-Cola", country: "Coca-Cola", code: "CC", number: i });
+}
 
 let toastTimer = null;
 
@@ -80,30 +88,36 @@ function updateAlbumProgress() {
 function updateControls() {
   const hideOwnedToggle = document.getElementById("hideOwnedToggle");
   if (hideOwnedToggle) hideOwnedToggle.checked = hideOwned;
-
   const sortAlphaToggle = document.getElementById("sortAlphaToggle");
   if (sortAlphaToggle) sortAlphaToggle.checked = sortAlpha;
 }
 
-// Returns all unique countries, optionally sorted alphabetically
-function getCountries() {
-  const countries = [...new Set(stickers.map(s => s.country))];
-  if (sortAlpha) {
-    return countries.slice().sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }
-  return countries;
+// Returns grouped structure: [{ category, countries[] }]
+// Only Seleções are sorted alphabetically when sortAlpha is on
+function getGroupedCountries() {
+  const categories = [...new Set(stickers.map(s => s.category))];
+  return categories.map(category => {
+    const countries = [...new Set(
+      stickers.filter(s => s.category === category).map(s => s.country)
+    )];
+    if (sortAlpha && category === "Seleções") {
+      countries.sort((a, b) => a.localeCompare(b, "pt-BR"));
+    }
+    return { category, countries };
+  });
 }
 
-// Build and update the A-Z sidebar
-function buildAlphaSidebar(countries) {
-  const existing = document.getElementById("alphaSidebar");
-  if (existing) existing.remove();
+// Build the A-Z sidebar (only shown when sortAlpha is on, only indexes Seleções)
+function buildAlphaSidebar(selecaoCountries) {
+  const existingSidebar = document.getElementById("alphaSidebar");
+  if (existingSidebar) existingSidebar.remove();
+  const existingBubble = document.getElementById("alphaBubble");
+  if (existingBubble) existingBubble.remove();
 
   if (!sortAlpha) return;
 
-  // Collect which first letters actually exist
   const letters = [...new Set(
-    countries.map(c => {
+    selecaoCountries.map(c => {
       const ch = c.normalize("NFD")[0].toUpperCase();
       return /[A-Z]/.test(ch) ? ch : "#";
     })
@@ -122,7 +136,6 @@ function buildAlphaSidebar(countries) {
 
   document.body.appendChild(sidebar);
 
-  // Bubble tooltip
   const bubble = document.createElement("div");
   bubble.id = "alphaBubble";
   bubble.className = "alpha-bubble hidden";
@@ -141,22 +154,16 @@ function buildAlphaSidebar(countries) {
 
   function scrollToLetter(letter, clientY) {
     if (!letter) return;
-
-    // Update bubble
     bubble.textContent = letter;
     bubble.classList.remove("hidden");
     bubble.style.top = `${clientY - 22}px`;
-
-    // Highlight sidebar item
     sidebar.querySelectorAll("span").forEach(s => {
       s.classList.toggle("active", s.dataset.letter === letter);
     });
-
-    // Find first card matching letter
     const anchor = document.getElementById(`alpha-${letter}`);
     if (anchor) {
       const y = anchor.getBoundingClientRect().top + window.scrollY - 100;
-      window.scrollTo({ top: y, behavior: "smooth" });
+      window.scrollTo({ top: y });
     }
   }
 
@@ -182,6 +189,12 @@ function buildAlphaSidebar(countries) {
   sidebar.addEventListener("pointercancel", end);
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+}
+
 function render() {
   updateAlbumProgress();
   updateControls();
@@ -189,124 +202,125 @@ function render() {
   const app = document.getElementById("app");
   app.innerHTML = "";
 
-  let lastLetter = null;
-
-  const countries = getCountries();
-
-  // Add alpha anchors map: letter -> first country card
-  const letterAnchors = {};
-
+  const groups = getGroupedCountries();
   let renderedCards = 0;
+  const lastLetterRef = { val: null };
 
-  countries.forEach(country => {
-    const countryStickers = stickers.filter(s => s.country === country);
+  groups.forEach(({ category, countries }) => {
+    const categoryWrap = document.createElement("div");
+    categoryWrap.className = "category-wrap";
 
-    const visibleStickers = countryStickers.filter(s => {
-      if (hideOwned) return !statusOf(s.id).owned;
-      return true;
-    });
+    const categoryTitle = document.createElement("h2");
+    categoryTitle.className = "category-title";
+    categoryTitle.textContent = category;
+    categoryWrap.appendChild(categoryTitle);
 
-    if (visibleStickers.length === 0) return;
+    let cardsInCategory = 0;
 
-    const ownedCount = countryStickers.filter(s => statusOf(s.id).owned).length;
-    const missingCount = countryStickers.length - ownedCount;
-    const percent = Math.round((ownedCount / countryStickers.length) * 100);
-    const isComplete = ownedCount === countryStickers.length;
-    const countryCode = countryStickers[0]?.code || "";
-    const cardKey = country;
-    const collapsed = !!collapsedCards[cardKey];
+    countries.forEach(country => {
+      const countryStickers = stickers.filter(s => s.country === country && s.category === category);
 
-    // Alpha letter anchor
-    if (sortAlpha) {
-      const firstChar = country.normalize("NFD")[0].toUpperCase();
-      const letter = /[A-Z]/.test(firstChar) ? firstChar : "#";
-      if (letter !== lastLetter) {
-        lastLetter = letter;
-        letterAnchors[letter] = `alpha-${letter}`;
+      const visibleStickers = countryStickers.filter(s => {
+        if (hideOwned) return !statusOf(s.id).owned;
+        return true;
+      });
+
+      if (visibleStickers.length === 0) return;
+
+      const ownedCount = countryStickers.filter(s => statusOf(s.id).owned).length;
+      const missingCount = countryStickers.length - ownedCount;
+      const percent = Math.round((ownedCount / countryStickers.length) * 100);
+      const isComplete = ownedCount === countryStickers.length;
+      const countryCode = countryStickers[0]?.code || "";
+      const cardKey = `${category}-${country}`;
+      const collapsed = !!collapsedCards[cardKey];
+
+      const card = document.createElement("section");
+      card.className = `country-card${collapsed ? " collapsed" : ""}${isComplete ? " complete" : ""}`;
+
+      // Alpha anchor only on Seleções cards when A-Z active
+      if (sortAlpha && category === "Seleções") {
+        const firstChar = country.normalize("NFD")[0].toUpperCase();
+        const letter = /[A-Z]/.test(firstChar) ? firstChar : "#";
+        if (letter !== lastLetterRef.val) {
+          lastLetterRef.val = letter;
+          card.id = `alpha-${letter}`;
+        }
       }
-    }
 
-    const card = document.createElement("section");
-    card.className = `country-card${collapsed ? " collapsed" : ""}${isComplete ? " complete" : ""}`;
-
-    // Set alpha anchor id on first card per letter
-    if (sortAlpha) {
-      const firstChar = country.normalize("NFD")[0].toUpperCase();
-      const letter = /[A-Z]/.test(firstChar) ? firstChar : "#";
-      if (!document.getElementById(`alpha-${letter}`)) {
-        card.id = `alpha-${letter}`;
-      }
-    }
-
-    card.innerHTML = `
-      <div class="country-head">
-        <div>
-          <h3 class="country-name">${escapeHtml(country)} <span class="country-code">• ${escapeHtml(countryCode)}</span></h3>
-          <div class="country-subtitle">${ownedCount} de ${countryStickers.length} coladas${isComplete ? " ✓ Completa!" : ` • ${missingCount} faltantes`}</div>
+      const showCode = category === "Seleções";
+      card.innerHTML = `
+        <div class="country-head">
+          <div>
+            <h3 class="country-name">${escapeHtml(country)}${showCode ? ` <span class="country-code">• ${escapeHtml(countryCode)}</span>` : ""}</h3>
+            <div class="country-subtitle">${ownedCount} de ${countryStickers.length} coladas${isComplete ? " ✓ Completa!" : ` • ${missingCount} faltantes`}</div>
+          </div>
+          <div class="country-right">
+            <div class="country-progress">${percent}%</div>
+            <button class="collapse-btn" aria-label="${collapsed ? "Abrir card" : "Minimizar card"}">
+              ${collapsed ? "›" : "⌄"}
+            </button>
+          </div>
         </div>
-        <div class="country-right">
-          <div class="country-progress">${percent}%</div>
-          <button class="collapse-btn" aria-label="${collapsed ? "Abrir card" : "Minimizar card"}">
-            ${collapsed ? "›" : "⌄"}
-          </button>
+        <div class="card-content ${collapsed ? "hidden-card" : ""}">
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:${percent}%"></div>
+          </div>
+          <div class="grid"></div>
         </div>
-      </div>
+      `;
 
-      <div class="card-content ${collapsed ? "hidden-card" : ""}">
-        <div class="progress-bar">
-          <div class="progress-fill" style="width:${percent}%"></div>
-        </div>
-        <div class="grid"></div>
-      </div>
-    `;
-
-    card.querySelector(".collapse-btn").addEventListener("click", e => {
-      e.stopPropagation();
-      collapsedCards[cardKey] = !collapsedCards[cardKey];
-      saveCollapsedCards();
-      render();
-    });
-
-    const grid = card.querySelector(".grid");
-
-    visibleStickers.forEach(sticker => {
-      const status = statusOf(sticker.id);
-      const button = document.createElement("button");
-      button.className = "sticker" + (status.owned ? " owned" : "");
-      button.textContent = sticker.number;
-
-      let lastPointerDown = 0;
-      let holdTimer = null;
-
-      button.addEventListener("click", () => {
-        if (Date.now() - lastPointerDown > 650) return;
-        const st = statusOf(sticker.id);
-        st.owned = !st.owned;
-        save();
+      card.querySelector(".collapse-btn").addEventListener("click", e => {
+        e.stopPropagation();
+        collapsedCards[cardKey] = !collapsedCards[cardKey];
+        saveCollapsedCards();
         render();
       });
 
-      button.addEventListener("pointerdown", () => {
-        lastPointerDown = Date.now();
-        clearTimeout(holdTimer);
-        holdTimer = setTimeout(() => {
+      const grid = card.querySelector(".grid");
+
+      visibleStickers.forEach(sticker => {
+        const status = statusOf(sticker.id);
+        const button = document.createElement("button");
+        button.className = "sticker" + (status.owned ? " owned" : "");
+        button.textContent = sticker.number;
+
+        let lastPointerDown = 0;
+        let holdTimer = null;
+
+        button.addEventListener("click", () => {
+          if (Date.now() - lastPointerDown > 650) return;
           const st = statusOf(sticker.id);
-          st.owned = false;
-          if (navigator.vibrate) navigator.vibrate(45);
+          st.owned = !st.owned;
           save();
           render();
-        }, 650);
+        });
+
+        button.addEventListener("pointerdown", () => {
+          lastPointerDown = Date.now();
+          clearTimeout(holdTimer);
+          holdTimer = setTimeout(() => {
+            const st = statusOf(sticker.id);
+            st.owned = false;
+            if (navigator.vibrate) navigator.vibrate(45);
+            save();
+            render();
+          }, 650);
+        });
+
+        button.addEventListener("pointerup", () => clearTimeout(holdTimer));
+        button.addEventListener("pointerleave", () => clearTimeout(holdTimer));
+        button.addEventListener("pointercancel", () => clearTimeout(holdTimer));
+
+        grid.appendChild(button);
       });
 
-      button.addEventListener("pointerup", () => clearTimeout(holdTimer));
-      button.addEventListener("pointerleave", () => clearTimeout(holdTimer));
-      button.addEventListener("pointercancel", () => clearTimeout(holdTimer));
-
-      grid.appendChild(button);
+      categoryWrap.appendChild(card);
+      cardsInCategory++;
+      renderedCards++;
     });
 
-    app.appendChild(card);
-    renderedCards++;
+    if (cardsInCategory > 0) app.appendChild(categoryWrap);
   });
 
   if (renderedCards === 0) {
@@ -316,13 +330,9 @@ function render() {
     app.appendChild(empty);
   }
 
-  buildAlphaSidebar(countries);
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+  // Sidebar indexes only Seleções
+  const selecoes = groups.find(g => g.category === "Seleções");
+  buildAlphaSidebar(selecoes ? selecoes.countries : []);
 }
 
 // ── Export helpers ──────────────────────────────────────────────
@@ -339,20 +349,29 @@ function buildPdfHtml(type) {
   const title = type === "missing" ? "Figurinhas faltantes" : "Todas as figurinhas";
   const today = new Date().toLocaleDateString("pt-BR");
 
-  const countries = [...new Set(exportItems.map(s => s.country))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const categories = [...new Set(exportItems.map(s => s.category))];
 
-  const countriesHtml = countries.map(country => {
-    const cs = exportItems.filter(s => s.country === country).sort((a, b) => a.number - b.number);
+  const groupsHtml = categories.map(category => {
+    const catItems = exportItems.filter(s => s.category === category);
+    const countries = [...new Set(catItems.map(s => s.country))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    const countriesHtml = countries.map(country => {
+      const cs = catItems.filter(s => s.country === country).sort((a, b) => a.number - b.number);
+      return `
+        <div class="pdf-country">
+          <h3>${escapeHtml(country)}</h3>
+          <div class="pdf-grid">
+            ${cs.map(sticker => {
+              const st = statusOf(sticker.id);
+              return `<div class="pdf-sticker ${st.owned ? "owned" : "missing"}"><strong>${sticker.number}</strong></div>`;
+            }).join("")}
+          </div>
+        </div>`;
+    }).join("");
     return `
-      <div class="pdf-country">
-        <h3>${escapeHtml(country)}</h3>
-        <div class="pdf-grid">
-          ${cs.map(sticker => {
-            const st = statusOf(sticker.id);
-            return `<div class="pdf-sticker ${st.owned ? "owned" : "missing"}"><strong>${sticker.number}</strong></div>`;
-          }).join("")}
-        </div>
-      </div>`;
+      <section class="pdf-category">
+        <h2>${escapeHtml(category)}</h2>
+        <div class="pdf-countries">${countriesHtml}</div>
+      </section>`;
   }).join("");
 
   return `<!DOCTYPE html>
@@ -368,6 +387,8 @@ function buildPdfHtml(type) {
     .pdf-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; border-bottom: 1px solid #237c4f; padding-bottom: 3px; margin-bottom: 3px; }
     .pdf-header h1 { margin: 0; font-size: 12px; }
     .pdf-header p { margin: 0; color: #6d6557; font-size: 6px; font-weight: 700; text-align: right; }
+    .pdf-category { margin: 0 0 10px; }
+    .pdf-category h2 { margin: 0 0 2px; padding: 1px 3px; border-radius: 4px; background: #237c4f; color: #fff; font-size: 7px; }
     .pdf-countries { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 4px; }
     .pdf-country { display: grid; grid-template-columns: 55px 1fr; align-items: center; gap: 2px; border: 1px solid #e5dbc4; border-radius: 4px; padding: 2px; min-height: 15px; break-inside: avoid; }
     .pdf-country h3 { margin: 0; font-size: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 900; }
@@ -386,9 +407,7 @@ function buildPdfHtml(type) {
       <h1>${escapeHtml(title)}</h1>
       <p>Figurinhas 2026 • ${today}<br>Total ${total} • Coladas ${owned} • Faltantes ${missing}</p>
     </section>
-    ${exportItems.length > 0
-      ? `<div class="pdf-countries">${countriesHtml}</div>`
-      : `<div class="empty">Nenhuma figurinha para exportar.</div>`}
+    ${exportItems.length > 0 ? groupsHtml : `<div class="empty">Nenhuma figurinha para exportar.</div>`}
   </main>
   <script>window.addEventListener("load", () => setTimeout(() => window.print(), 350));<\/script>
 </body>
