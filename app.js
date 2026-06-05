@@ -351,11 +351,10 @@ function showRemoveConfirm(sticker) {
   modal.setAttribute("aria-modal", "true");
   modal.innerHTML = `
     <div class="modal-card remove-modal-card">
-      <div class="remove-modal-icon">🗑️</div>
+      <div class="remove-modal-icon"></div>
       <h2>Remover figurinha?</h2>
-      <p>Deseja marcar a figurinha <strong>${escapeHtml(sticker.code)}-${sticker.number}</strong> (${escapeHtml(sticker.country)}) como não colada?</p>
       <div class="modal-actions">
-        <button id="removeConfirmBtn" type="button">Sim, remover</button>
+        <button id="removeConfirmBtn" type="button">Remover</button>
         <button id="removeCancelBtn" type="button" class="remove-no-btn">Cancelar</button>
       </div>
     </div>
