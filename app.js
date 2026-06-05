@@ -285,26 +285,29 @@ function render() {
         button.className = "sticker" + (status.owned ? " owned" : "");
         button.textContent = sticker.number;
 
-        let lastPointerDown = 0;
         let holdTimer = null;
+        let holdFired = false;
 
         button.addEventListener("click", () => {
-          if (Date.now() - lastPointerDown > 650) return;
+          if (holdFired) { holdFired = false; return; }
           const st = statusOf(sticker.id);
-          st.owned = !st.owned;
-          save();
-          render();
+          if (!st.owned) {
+            st.owned = true;
+            save();
+            render();
+          }
         });
 
         button.addEventListener("pointerdown", () => {
-          lastPointerDown = Date.now();
+          holdFired = false;
           clearTimeout(holdTimer);
           holdTimer = setTimeout(() => {
             const st = statusOf(sticker.id);
-            st.owned = false;
-            if (navigator.vibrate) navigator.vibrate(45);
-            save();
-            render();
+            if (st.owned) {
+              holdFired = true;
+              if (navigator.vibrate) navigator.vibrate(45);
+              showRemoveConfirm(sticker);
+            }
           }, 650);
         });
 
@@ -333,6 +336,47 @@ function render() {
   // Sidebar indexes only Seleções
   const selecoes = groups.find(g => g.category === "Seleções");
   buildAlphaSidebar(selecoes ? selecoes.countries : []);
+}
+
+// ── Remove confirmation ─────────────────────────────────────────
+
+function showRemoveConfirm(sticker) {
+  const existing = document.getElementById("removeModal");
+  if (existing) existing.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "removeModal";
+  modal.className = "modal";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.innerHTML = `
+    <div class="modal-card remove-modal-card">
+      <div class="remove-modal-icon">🗑️</div>
+      <h2>Remover figurinha?</h2>
+      <p>Deseja marcar a figurinha <strong>${escapeHtml(sticker.code)}-${sticker.number}</strong> (${escapeHtml(sticker.country)}) como não colada?</p>
+      <div class="modal-actions">
+        <button id="removeConfirmBtn" type="button">Sim, remover</button>
+        <button id="removeCancelBtn" type="button" class="remove-no-btn">Cancelar</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  document.getElementById("removeConfirmBtn").onclick = () => {
+    const st = statusOf(sticker.id);
+    st.owned = false;
+    save();
+    modal.remove();
+    render();
+    showToast(`Figurinha ${sticker.code}-${sticker.number} removida.`);
+  };
+
+  document.getElementById("removeCancelBtn").onclick = () => modal.remove();
+
+  modal.addEventListener("click", e => {
+    if (e.target === modal) modal.remove();
+  });
 }
 
 // ── Export helpers ──────────────────────────────────────────────
